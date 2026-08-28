@@ -1,0 +1,30 @@
+# Historical target name preserved from the original mayhemheroes integration (project neper /
+# target neper) so Mayhem run history stays attached. The command mirrors the old root Mayhemfile
+# (`neper -T -loadtesr @@ -transform autocrop -o ot`) exactly, with two additive fixes:
+#   - the binary now lives at /mayhem/neper (new layout) instead of /install/bin/neper
+#   - the output prefix is /tmp/neper-out instead of the relative `ot`: Mayhem mounts the commit
+#     image READ-ONLY during coverage collection, and a relative/`/mayhem`-rooted output path fails
+#     to write on every input (0 edges). See docs/seed-corpus.md / SPEC 6.2 item 13.
+#
+# No `filepath:` — verified locally (docker run, base:20260621) that `-loadtesr` dispatches on file
+# CONTENT (the "***tesr" magic header via ut_file_format(), not the path's extension): identical
+# behavior/output running on a `.tesr`-suffixed path vs a bare suffix-less path. This is a
+# content-sniffing target (like hh-suite/vigra), not an extension-dispatching one.
+project: savantenvs/neper
+target: neper
+
+# Canonical two-entry seed directive (docs/seed-corpus.md): the server-accumulated tar plus the
+# per-target committed seeds at mayhem/neper/testsuite (4 real .tesr files pulled from neper's own
+# CTest fixtures: tests/T/loadtesr, tests/T/format_2d, tests/T/tesrsize, tests/T/tesrformat — cover
+# both tesr format versions 2.1/2.2, 2D and 3D, and multiple raster sizes).
+testsuite:
+  - https://$MAYHEM_DOMAIN/$MAYHEM_PROJECT/$MAYHEM_TARGET/testsuite.tar
+  - file://mayhem/neper/testsuite
+
+cmds:
+  - cmd: /mayhem/neper -T -loadtesr @@ -transform autocrop -o /tmp/neper-out
+    # Run #1 ended "crashes or times out on every test case in the test suite and on the default
+    # test case" while fuzzing itself still reached 12148 edges — Mayhem needs at least one seed to
+    # pass before it will start, and tessellation loading + `-transform autocrop` is far too heavy
+    # for the default 2s budget under Mayhem's instrumented execution of the ASan build.
+    timeout: 30
